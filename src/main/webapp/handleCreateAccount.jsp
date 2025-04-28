@@ -40,7 +40,7 @@
 		    if (rs.next()) {
 		      response.sendRedirect("signup.jsp?error=Username+already+exists");
 		    } else {
-		      PreparedStatement insert = con.prepareStatement("INSERT INTO individual (fname, lname, username, password) VALUES (?, ?, ?, ?)");
+		      PreparedStatement insert = con.prepareStatement("INSERT INTO individual (uid, first_name, last_name, username, password) VALUES (22, ?, ?, ?, ?)");
 		      insert.setString(1, fname);
 		      insert.setString(2, lname);
 		      insert.setString(3, username);

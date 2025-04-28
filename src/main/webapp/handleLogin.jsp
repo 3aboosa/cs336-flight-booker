@@ -28,7 +28,7 @@
 			ApplicationDB db = new ApplicationDB();	
 			Connection con = db.getConnection();
 		
-		    PreparedStatement stmt = con.prepareStatement("SELECT fname, password FROM individual WHERE username = ?");
+		    PreparedStatement stmt = con.prepareStatement("SELECT first_name, password FROM individual WHERE username = ?");
 		    stmt.setString(1, username);
 		    ResultSet rs = stmt.executeQuery();
 		
@@ -36,7 +36,7 @@
 		      String dbPassword = rs.getString("password");
 		      if (dbPassword.equals(password)) {
 		        validUser = true;
-		        firstName = rs.getString("fname");
+		        firstName = rs.getString("first_name");
 		      }
 		    }
 		
