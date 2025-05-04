@@ -1,2 +1,4 @@
 *.DS_Store
 *.class
+src/main/webapp/WEB-INF
+src/main/java/com/cs336/pkg/ApplicationDB.java
