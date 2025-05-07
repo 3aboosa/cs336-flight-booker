@@ -1,339 +1,489 @@
-<%@ page language="java" contentType="text/html; charset=ISO-8859-1"
-    pageEncoding="ISO-8859-1" import="com.cs336.pkg.*"%>
-<%@ page import="java.io.*,java.util.*,java.sql.*"%>
-<%@ page import="javax.servlet.http.*,javax.servlet.*" %>
+<%@ page language="java"
+         contentType="text/html; charset=ISO-8859-1"
+         pageEncoding="ISO-8859-1"
+         import="java.sql.*, java.util.*, java.math.BigDecimal, com.cs336.pkg.ApplicationDB" %>
 <!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-  <title>Welcome</title>
+  <meta charset="ISO-8859-1">
+  <title>Flight Search</title>
   <style>
-    body { margin:0; padding:0; font-family:Arial,sans-serif; }
+    body { margin:0; padding:20px; font-family:Arial,sans-serif; }
+    h1 { margin-top:0; }
+    .layout { display:flex; align-items:flex-start; }
+    #filters {
+      width:260px;
+      padding-right:20px;
+      border-right:1px solid #ccc;
+      box-sizing:border-box;
+    }
+    #results {
+      flex:1;
+      padding-left:20px;
+      box-sizing:border-box;
+    }
     .form-row { margin-bottom:1em; }
-    table { width:100%; border-collapse:collapse; }
+    table { width:100%; border-collapse:collapse; margin-bottom:2em; }
     th, td { border:1px solid #ddd; padding:8px; text-align:left; }
-    tr:nth-child(even){background:#f9f9f9;}
+    tr:nth-child(even){ background:#f9f9f9; }
+    input[type="text"] { width:60px; }
   </style>
   <script>
-    function toggleReturnField(){
-      var isOneWay = document.getElementById('oneWay').checked;
-      document.getElementById('returnField').style.display = isOneWay?'none':'block';
+    function toggleFilters(){
+      var oneWay = document.getElementById('oneWay').checked;
+      document.getElementById('returnRow').style.display   = oneWay ? 'none' : 'block';
+      var tf = document.getElementById('timeFilters');
+      if(tf) tf.style.display = oneWay ? 'block' : 'none';
     }
-    document.addEventListener('DOMContentLoaded',function(){
-      document.getElementById('oneWay').addEventListener('change',toggleReturnField);
-      document.getElementById('roundTrip').addEventListener('change',toggleReturnField);
-      toggleReturnField();
-    });
+    window.addEventListener('DOMContentLoaded', toggleFilters);
   </script>
 </head>
 <body>
 <%
-  // no‐cache headers
+  // Prevent caching
   response.setHeader("Cache-Control","no-cache,no-store,must-revalidate");
   response.setHeader("Pragma","no-cache");
   response.setDateHeader("Expires",0);
 
-  // auth check & fetch first name
-  if(session.getAttribute("username")==null){
-    response.sendRedirect("login.jsp"); return;
+  // Auth
+  String username = (String)session.getAttribute("username");
+  if(username==null){
+    response.sendRedirect("login.jsp");
+    return;
   }
-  String user=(String)session.getAttribute("username"), firstName="";
-  try{
-    ApplicationDB db=new ApplicationDB();
-    Connection c=db.getConnection();
-    PreparedStatement p=c.prepareStatement("SELECT first_name FROM individual WHERE username=?");
-    p.setString(1,user);
-    ResultSet r=p.executeQuery();
-    if(r.next()) firstName=r.getString("first_name");
-    r.close(); p.close(); c.close();
-  } catch(Exception e){
-    out.println("Error: "+e.getMessage());
+
+  // Load first name
+  String firstName="";
+  try(Connection c=new ApplicationDB().getConnection();
+      PreparedStatement p=c.prepareStatement(
+        "SELECT first_name FROM individual WHERE username=?"
+      )){
+    p.setString(1,username);
+    try(ResultSet r=p.executeQuery()){
+      if(r.next()) firstName=r.getString("first_name");
+    }
+  }catch(Exception ignored){}
+
+  // Read params
+  String tripType     = request.getParameter("tripType"),
+         from         = request.getParameter("Source"),
+         to           = request.getParameter("Destination"),
+         depDate      = request.getParameter("departure"),
+         retDate      = request.getParameter("returnDate"),
+         minPrice     = request.getParameter("minPrice"),
+         maxPrice     = request.getParameter("maxPrice"),
+         selAir       = request.getParameter("airline"),
+         sortBy       = request.getParameter("sortBy"),
+         sortDir      = request.getParameter("sortDir");
+  boolean flexible    = request.getParameter("flexibleDates")!=null;
+  String[] stopsArr   = request.getParameterValues("stops");
+  String depTimeStart = request.getParameter("depTimeStart"),
+         depTimeEnd   = request.getParameter("depTimeEnd"),
+         arrTimeStart = request.getParameter("arrTimeStart"),
+         arrTimeEnd   = request.getParameter("arrTimeEnd");
+  boolean isRound = "roundTrip".equals(tripType);
+
+  // Result lists
+  List<Map<String,Object>> outboundList = new ArrayList<>(),
+                             returnList   = new ArrayList<>();
+
+  // Query building...
+  if(from!=null && to!=null && depDate!=null && !depDate.isEmpty()){
+    try(Connection con=new ApplicationDB().getConnection()){
+      // Tail for one-way filters & sort
+      StringBuilder tail = new StringBuilder();
+      if(!isRound){
+        if(minPrice!=null&&!minPrice.isEmpty()) tail.append("AND price>=? ");
+        if(maxPrice!=null&&!maxPrice.isEmpty()) tail.append("AND price<=? ");
+        if(stopsArr!=null){
+          tail.append("AND number_of_stops IN (")
+              .append(String.join(",", Collections.nCopies(stopsArr.length,"?")))
+              .append(") ");
+        }
+        if(depTimeStart!=null&&!depTimeStart.isEmpty()) tail.append("AND TIME(departure_time)>=? ");
+        if(depTimeEnd  !=null&&!depTimeEnd.isEmpty())   tail.append("AND TIME(departure_time)<=? ");
+        if(arrTimeStart!=null&&!arrTimeStart.isEmpty()) tail.append("AND TIME(arrival_time)>=? ");
+        if(arrTimeEnd  !=null&&!arrTimeEnd.isEmpty())   tail.append("AND TIME(arrival_time)<=? ");
+      }
+      if(selAir!=null&&!selAir.isEmpty()) tail.append("AND airline_id=? ");
+      if(!isRound && sortBy!=null&&!sortBy.isEmpty()){
+        tail.append("ORDER BY ")
+            .append("duration".equals(sortBy)?"duration":sortBy)
+            .append(" ").append(sortDir!=null?sortDir:"ASC");
+      }
+
+      // OUTBOUND
+      StringBuilder outSql = new StringBuilder(
+        "SELECT *, TIMESTAMPDIFF(MINUTE,departure_time,arrival_time) AS duration "
+        +"FROM flights WHERE departure_airport_id=? AND arrival_airport_id=? "
+      );
+      if(flexible){
+        outSql.append("AND DATE(departure_time) BETWEEN DATE_SUB(?,INTERVAL 3 DAY) ")
+              .append("AND DATE_ADD(?,INTERVAL 3 DAY) ");
+      } else {
+        outSql.append("AND DATE(departure_time)=? ");
+      }
+      outSql.append(tail);
+
+      try(PreparedStatement pout=con.prepareStatement(outSql.toString())){
+        int idx=1;
+        pout.setString(idx++,from);
+        pout.setString(idx++,to);
+        if(flexible){
+          pout.setString(idx++,depDate);
+          pout.setString(idx++,depDate);
+        } else {
+          pout.setString(idx++,depDate);
+        }
+        if(!isRound){
+          if(minPrice!=null&&!minPrice.isEmpty()) pout.setBigDecimal(idx++,new BigDecimal(minPrice));
+          if(maxPrice!=null&&!maxPrice.isEmpty()) pout.setBigDecimal(idx++,new BigDecimal(maxPrice));
+          if(stopsArr!=null) for(String s:stopsArr) pout.setInt(idx++,Integer.parseInt(s));
+          if(depTimeStart!=null&&!depTimeStart.isEmpty()){
+            String v=depTimeStart.length()==5?depTimeStart+":00":depTimeStart;
+            pout.setTime(idx++,Time.valueOf(v));
+          }
+          if(depTimeEnd!=null&&!depTimeEnd.isEmpty()){
+            String v=depTimeEnd.length()==5?depTimeEnd+":00":depTimeEnd;
+            pout.setTime(idx++,Time.valueOf(v));
+          }
+          if(arrTimeStart!=null&&!arrTimeStart.isEmpty()){
+            String v=arrTimeStart.length()==5?arrTimeStart+":00":arrTimeStart;
+            pout.setTime(idx++,Time.valueOf(v));
+          }
+          if(arrTimeEnd!=null&&!arrTimeEnd.isEmpty()){
+            String v=arrTimeEnd.length()==5?arrTimeEnd+":00":arrTimeEnd;
+            pout.setTime(idx++,Time.valueOf(v));
+          }
+        }
+        if(selAir!=null&&!selAir.isEmpty()) pout.setString(idx++,selAir);
+
+        try(ResultSet rs=pout.executeQuery()){
+          while(rs.next()){
+            Map<String,Object> m=new HashMap<>();
+            m.put("flight_id", rs.getString("flight_id"));
+            m.put("price",     rs.getBigDecimal("price"));
+            m.put("departure_time",rs.getTimestamp("departure_time"));
+            m.put("arrival_time",  rs.getTimestamp("arrival_time"));
+            m.put("departure_airport_id", rs.getString("departure_airport_id"));
+            m.put("arrival_airport_id",   rs.getString("arrival_airport_id"));
+            m.put("number_of_stops", rs.getInt("number_of_stops"));
+            m.put("airline_id",      rs.getString("airline_id"));
+            m.put("duration",        rs.getInt("duration"));
+            outboundList.add(m);
+          }
+        }
+      }
+
+      // RETURN (round-trip)
+      if(isRound && retDate!=null && !retDate.isEmpty()){
+        StringBuilder retSql=new StringBuilder(
+          "SELECT *, TIMESTAMPDIFF(MINUTE,departure_time,arrival_time) AS duration "
+          +"FROM flights WHERE departure_airport_id=? AND arrival_airport_id=? "
+        );
+        if(flexible){
+          retSql.append("AND DATE(departure_time) BETWEEN DATE_SUB(?,INTERVAL 3 DAY) ")
+                .append("AND DATE_ADD(?,INTERVAL 3 DAY) ");
+        } else {
+          retSql.append("AND DATE(departure_time)=? ");
+        }
+        if(selAir!=null&&!selAir.isEmpty()) retSql.append("AND airline_id=? ");
+
+        try(PreparedStatement pret=con.prepareStatement(retSql.toString())){
+          int j=1;
+          pret.setString(j++,to);
+          pret.setString(j++,from);
+          if(flexible){
+            pret.setString(j++,retDate);
+            pret.setString(j++,retDate);
+          } else {
+            pret.setString(j++,retDate);
+          }
+          if(selAir!=null&&!selAir.isEmpty()) pret.setString(j++,selAir);
+
+          try(ResultSet rr=pret.executeQuery()){
+            while(rr.next()){
+              Map<String,Object> m=new HashMap<>();
+              m.put("flight_id", rr.getString("flight_id"));
+              m.put("price",     rr.getBigDecimal("price"));
+              m.put("departure_time",rr.getTimestamp("departure_time"));
+              m.put("arrival_time",  rr.getTimestamp("arrival_time"));
+              m.put("departure_airport_id", rr.getString("departure_airport_id"));
+              m.put("arrival_airport_id",   rr.getString("arrival_airport_id"));
+              m.put("number_of_stops", rr.getInt("number_of_stops"));
+              m.put("airline_id",      rr.getString("airline_id"));
+              m.put("duration",        rr.getInt("duration"));
+              returnList.add(m);
+            }
+          }
+        }
+      }
+
+    } catch(Exception ignored){}
+  }
+
+  // Build round-trip options + totals
+  List<Map<String,Object>> tripOptions=new ArrayList<>();
+  if(isRound){
+    BigDecimal minP = (minPrice!=null&&!minPrice.isEmpty())?new BigDecimal(minPrice):null;
+    BigDecimal maxP = (maxPrice!=null&&!maxPrice.isEmpty())?new BigDecimal(maxPrice):null;
+    Set<Integer> stopsSet=new HashSet<>();
+    if(stopsArr!=null) for(String s:stopsArr) stopsSet.add(Integer.parseInt(s));
+
+    for(var o:outboundList) for(var r:returnList){
+      BigDecimal pO=(BigDecimal)o.get("price"), pR=(BigDecimal)r.get("price");
+      int sO=(Integer)o.get("number_of_stops"), sR=(Integer)r.get("number_of_stops"),
+          dO=(Integer)o.get("duration"),        dR=(Integer)r.get("duration");
+      BigDecimal totalPrice=pO.add(pR);
+      int totalStops=sO+sR, totalDuration=dO+dR;
+
+      if(minP!=null && totalPrice.compareTo(minP)<0) continue;
+      if(maxP!=null && totalPrice.compareTo(maxP)>0) continue;
+      if(!stopsSet.isEmpty()){
+        boolean ok=false;
+        for(int cat:stopsSet){
+          if((cat<2 && totalStops==cat) || (cat>=2 && totalStops>=2)){ ok=true; break; }
+        }
+        if(!ok) continue;
+      }
+
+      Map<String,Object> opt=new HashMap<>();
+      opt.put("out",o);
+      opt.put("ret",r);
+      opt.put("totalPrice",totalPrice);
+      opt.put("totalStops",totalStops);
+      opt.put("totalDuration",totalDuration);
+      tripOptions.add(opt);
+    }
+
+    if(sortBy!=null&&!sortBy.isEmpty()){
+      final int dir="DESC".equals(sortDir)?-1:1;
+      tripOptions.sort((a,b)->{
+        switch(sortBy){
+          case "price":
+            return ((BigDecimal)a.get("totalPrice"))
+                   .compareTo((BigDecimal)b.get("totalPrice"))*dir;
+          case "duration":
+            return ((Integer)a.get("totalDuration"))
+                   .compareTo((Integer)b.get("totalDuration"))*dir;
+          default:
+            return 0;
+        }
+      });
+    }
   }
 %>
 
 <div><a href="handleLogout.jsp">Logout</a></div>
 <h1>Welcome, <%= firstName %>!</h1>
 
-<form method="get">
-  <!-- Trip type -->
-  <div class="form-row">
-    <input type="radio" id="oneWay" name="tripType" value="oneWay"
-      <%= "oneWay".equals(request.getParameter("tripType")) || request.getParameter("tripType")==null ? "checked" : "" %> >
-    <label for="oneWay">One-Way</label>
-    <input type="radio" id="roundTrip" name="tripType" value="roundTrip"
-      <%= "roundTrip".equals(request.getParameter("tripType")) ? "checked" : "" %> >
-    <label for="roundTrip">Round-Trip</label>
+<div class="layout">
+  <!-- Left: filters + search -->
+  <div id="filters">
+    <form method="get">
+      <!-- Trip type -->
+      <div class="form-row">
+        <input type="radio" id="oneWay" name="tripType" value="oneWay"
+          <%= tripType==null||"oneWay".equals(tripType)?"checked":"" %>
+          onchange="toggleFilters()" />
+        <label for="oneWay">One-Way</label>
+
+        <input type="radio" id="roundTrip" name="tripType" value="roundTrip"
+          <%= "roundTrip".equals(tripType)?"checked":"" %>
+          onchange="toggleFilters()" />
+        <label for="roundTrip">Round-Trip</label>
+      </div>
+
+      <!-- From/To -->
+      <div class="form-row">
+        <label>From:</label>
+        <input type="text" name="Source" value="<%=from!=null?from:""%>" required>
+        <label>To:</label>
+        <input type="text" name="Destination" value="<%=to!=null?to:""%>" required>
+      </div>
+
+      <!-- Dep/Return dates -->
+      <div class="form-row">
+        <label>Departure:</label>
+        <input type="date" name="departure"
+          value="<%=depDate!=null?depDate:""%>" required>
+      </div>
+      <div class="form-row" id="returnRow">
+        <label>Return:</label>
+        <input type="date" name="returnDate"
+          value="<%=retDate!=null?retDate:""%>">
+      </div>
+
+      <div class="form-row">
+        <input type="checkbox" name="flexibleDates" id="flexibleDates"
+          <%=flexible?"checked":""%>/>
+        <label for="flexibleDates">Flexible Dates (±3 Days)</label>
+      </div>
+
+      <!-- Sort -->
+      <div class="form-row">
+        <strong>Sort By:</strong>
+        <select name="sortBy">
+          <option value=""   <%= "".equals(sortBy)?"selected":"" %>>--</option>
+          <option value="price"          <%= "price".equals(sortBy)?"selected":""%>>Price</option>
+          <option value="departure_time" <%= "departure_time".equals(sortBy)?"selected":""%>>Take-off</option>
+          <option value="arrival_time"   <%= "arrival_time".equals(sortBy)?"selected":""%>>Landing</option>
+          <option value="duration"       <%= "duration".equals(sortBy)?"selected":""%>>Duration</option>
+        </select>
+        <select name="sortDir">
+          <option value="ASC"  <%= "ASC".equals(sortDir)?"selected":""%>>Asc</option>
+          <option value="DESC" <%= "DESC".equals(sortDir)?"selected":""%>>Desc</option>
+        </select>
+      </div>
+
+      <!-- Sidebar filters -->
+      <div class="form-row">
+        <strong>Stops</strong><br/>
+        <label><input type="checkbox" name="stops" value="0"
+          <%= stopsArr!=null&&Arrays.asList(stopsArr).contains("0")?"checked":""%>/>Nonstop</label><br/>
+        <label><input type="checkbox" name="stops" value="1"
+          <%= stopsArr!=null&&Arrays.asList(stopsArr).contains("1")?"checked":""%>/>1 stop</label><br/>
+        <label><input type="checkbox" name="stops" value="2"
+          <%= stopsArr!=null&&Arrays.asList(stopsArr).contains("2")?"checked":""%>/>2+ stops</label>
+      </div>
+
+      <div class="form-row">
+        <strong>Price</strong><br/>
+        <input type="text" name="minPrice" placeholder="Min"
+               value="<%=minPrice!=null?minPrice:""%>"/> to
+        <input type="text" name="maxPrice" placeholder="Max"
+               value="<%=maxPrice!=null?maxPrice:""%>"/>
+      </div>
+
+      <div class="form-row">
+        <strong>Airline</strong><br/>
+        <select name="airline">
+          <option value="">--</option>
+          <%
+            try(Connection c=new ApplicationDB().getConnection();
+                PreparedStatement ps=c.prepareStatement(
+                  "SELECT airline_id, Name FROM airline ORDER BY Name"
+                );
+                ResultSet rs=ps.executeQuery()) {
+              while(rs.next()){
+                String id=rs.getString("airline_id"),
+                       nm=rs.getString("Name");
+          %>
+            <option value="<%=id%>" <%=id.equals(selAir)?"selected":""%>>
+              <%=nm%>
+            </option>
+          <%
+              }
+            }
+          %>
+        </select>
+      </div>
+
+      <!-- Time filters (one-way only) -->
+      <div id="timeFilters">
+        <div class="form-row">
+          <strong>Take-off Time</strong><br/>
+          From <input type="time" name="depTimeStart" step="60"
+                      value="<%=depTimeStart!=null?depTimeStart:""%>"/>
+          To   <input type="time" name="depTimeEnd"   step="60"
+                      value="<%=depTimeEnd!=null?depTimeEnd:""%>"/>
+        </div>
+        <div class="form-row">
+          <strong>Landing Time</strong><br/>
+          From <input type="time" name="arrTimeStart" step="60"
+                      value="<%=arrTimeStart!=null?arrTimeStart:""%>"/>
+          To   <input type="time" name="arrTimeEnd"   step="60"
+                      value="<%=arrTimeEnd!=null?arrTimeEnd:""%>"/>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <button type="submit">Search</button>
+      </div>
+    </form>
   </div>
 
-  <!-- From / To -->
-  <div class="form-row">
-    <label>From:</label>
-    <input type="text" name="Source"
-      value="<%= request.getParameter("Source")==null?"":request.getParameter("Source") %>" required>
-    <label>To:</label>
-    <input type="text" name="Destination"
-      value="<%= request.getParameter("Destination")==null?"":request.getParameter("Destination") %>" required>
-  </div>
-
-  <!-- Dates -->
-  <div class="form-row">
-    <label>Departure:</label>
-    <input type="date" name="departure"
-      value="<%= request.getParameter("departure")==null?"":request.getParameter("departure") %>" required>
-  </div>
-  <div class="form-row" id="returnField">
-    <label>Return:</label>
-    <input type="date" name="returnDate"
-      value="<%= request.getParameter("returnDate")==null?"":request.getParameter("returnDate") %>">
-  </div>
-  <div class="form-row">
-    <input type="checkbox" name="flexibleDates" id="flexibleDates"
-      <%= request.getParameter("flexibleDates")!=null?"checked":"" %> >
-    <label for="flexibleDates">Flexible Dates (+/−3 Days)</label>
-  </div>
-
-  <!-- Price Ranges (checkboxes) -->
-  <div class="form-row">
-    <strong>Price:</strong>
-    <label><input type="checkbox" name="priceRange" value="low"
-      <%= Arrays.asList(request.getParameterValues("priceRange")==null?new String[]{}:request.getParameterValues("priceRange")).contains("low")?"checked":"" %>>
-      ≤ 300</label>
-    <label><input type="checkbox" name="priceRange" value="mid"
-      <%= Arrays.asList(request.getParameterValues("priceRange")==null?new String[]{}:request.getParameterValues("priceRange")).contains("mid")?"checked":"" %>>
-      300–600</label>
-    <label><input type="checkbox" name="priceRange" value="high"
-      <%= Arrays.asList(request.getParameterValues("priceRange")==null?new String[]{}:request.getParameterValues("priceRange")).contains("high")?"checked":"" %>>
-      > 600</label>
-  </div>
-
-  <!-- Stops (checkboxes) -->
-  <div class="form-row">
-    <strong>Stops:</strong>
-    <label><input type="checkbox" name="stops" value="0"
-      <%= Arrays.asList(request.getParameterValues("stops")==null?new String[]{}:request.getParameterValues("stops")).contains("0")?"checked":"" %>>0</label>
-    <label><input type="checkbox" name="stops" value="1"
-      <%= Arrays.asList(request.getParameterValues("stops")==null?new String[]{}:request.getParameterValues("stops")).contains("1")?"checked":"" %>>1</label>
-    <label><input type="checkbox" name="stops" value="2"
-      <%= Arrays.asList(request.getParameterValues("stops")==null?new String[]{}:request.getParameterValues("stops")).contains("2")?"checked":"" %>>2+</label>
-  </div>
-
-  <!-- Airlines (checkboxes) -->
-  <div class="form-row">
-    <strong>Airline:</strong>
-    <%
-      String[] allAir = {"AA","DL","BA","UA","SW"};
-      String[] selAir = request.getParameterValues("airlines");
-      for(String code: allAir){
-        boolean checked = selAir!=null && Arrays.asList(selAir).contains(code);
+  <!-- Right: results, starting at the very top -->
+  <div id="results">
+    <% if(isRound){ 
+         if(tripOptions.isEmpty()){ %>
+      <h2>No matching round-trip options.</h2>
+    <% } else {
+         for(var opt:tripOptions){
+           Map<String,Object> o=(Map<String,Object>)opt.get("out"),
+                               r=(Map<String,Object>)opt.get("ret");
     %>
-      <label>
-        <input type="checkbox" name="airlines" value="<%=code%>" <%=checked?"checked":""%>>
-        <%=code%>
-      </label>
-    <%
-      }
-    %>
+      <table>
+        <tr style="background:#eee;">
+          <th>Reserve</th>
+          <th>ID</th><th>Price</th><th>Dep</th><th>Arr</th>
+          <th>From</th><th>To</th><th>Stops</th><th>Airline</th><th>Dur</th>
+        </tr>
+        <tr>
+          <td rowspan="3">
+            <input type="checkbox"
+              onclick="location='reserve.jsp?outId=<%=o.get("flight_id")%>&retId=<%=r.get("flight_id")%>'"/>
+          </td>
+          <td><%=o.get("flight_id")%></td>
+          <td><%=o.get("price")%></td>
+          <td><%=o.get("departure_time")%></td>
+          <td><%=o.get("arrival_time")%></td>
+          <td><%=o.get("departure_airport_id")%></td>
+          <td><%=o.get("arrival_airport_id")%></td>
+          <td><%=o.get("number_of_stops")%></td>
+          <td><%=o.get("airline_id")%></td>
+          <td><%=o.get("duration")%></td>
+        </tr>
+        <tr>
+          <td><%=r.get("flight_id")%></td>
+          <td><%=r.get("price")%></td>
+          <td><%=r.get("departure_time")%></td>
+          <td><%=r.get("arrival_time")%></td>
+          <td><%=r.get("departure_airport_id")%></td>
+          <td><%=r.get("arrival_airport_id")%></td>
+          <td><%=r.get("number_of_stops")%></td>
+          <td><%=r.get("airline_id")%></td>
+          <td><%=r.get("duration")%></td>
+        </tr>
+        <tr style="font-weight:bold;">
+          <td colspan="2">Totals</td>
+          <td><%=opt.get("totalPrice")%></td>
+          <td colspan="2"></td>
+          <td colspan="2">Stops: <%=opt.get("totalStops")%></td>
+          <td colspan="2">Dur: <%=opt.get("totalDuration")%> min</td>
+        </tr>
+      </table>
+    <%   }
+       }
+     } else { %>
+
+      <h2>Available Flights</h2>
+      <table>
+        <tr>
+          <th>Reserve</th><th>ID</th><th>Price</th>
+          <th>Dep Time</th><th>Arr Time</th>
+          <th>From</th><th>To</th><th>Stops</th>
+          <th>Airline</th><th>Duration</th>
+        </tr>
+        <% for(Map<String,Object> f: outboundList){ %>
+        <tr>
+          <td><input type="checkbox"
+            onclick="location='reserve.jsp?flightId=<%=f.get("flight_id")%>'"/></td>
+          <td><%=f.get("flight_id")%></td>
+          <td><%=f.get("price")%></td>
+          <td><%=f.get("departure_time")%></td>
+          <td><%=f.get("arrival_time")%></td>
+          <td><%=f.get("departure_airport_id")%></td>
+          <td><%=f.get("arrival_airport_id")%></td>
+          <td><%=f.get("number_of_stops")%></td>
+          <td><%=f.get("airline_id")%></td>
+          <td><%=f.get("duration")%></td>
+        </tr>
+        <% } %>
+      </table>
+
+    <% } %>
   </div>
-
-  <!-- Departure Time Range -->
-  <div class="form-row">
-    <label>Dep Time From:</label>
-    <input type="time" name="depTimeStart"
-      value="<%= request.getParameter("depTimeStart")==null?"":request.getParameter("depTimeStart") %>">
-    <label>To:</label>
-    <input type="time" name="depTimeEnd"
-      value="<%= request.getParameter("depTimeEnd")==null?"":request.getParameter("depTimeEnd") %>">
-  </div>
-
-  <!-- Arrival Time Range -->
-  <div class="form-row">
-    <label>Arr Time From:</label>
-    <input type="time" name="arrTimeStart"
-      value="<%= request.getParameter("arrTimeStart")==null?"":request.getParameter("arrTimeStart") %>">
-    <label>To:</label>
-    <input type="time" name="arrTimeEnd"
-      value="<%= request.getParameter("arrTimeEnd")==null?"":request.getParameter("arrTimeEnd") %>">
-  </div>
-
-  <!-- Sort Options -->
-  <div class="form-row">
-    <label>Sort By:</label>
-    <select name="sortBy">
-      <option value=""   <%= "".equals(request.getParameter("sortBy"))?"selected":"" %>>--</option>
-      <option value="price"          <%= "price".equals(request.getParameter("sortBy"))?"selected":"" %>>Price</option>
-      <option value="departure_time" <%= "departure_time".equals(request.getParameter("sortBy"))?"selected":""%>>Take-off</option>
-      <option value="arrival_time"   <%= "arrival_time".equals(request.getParameter("sortBy"))?"selected":"" %>>Landing</option>
-      <option value="duration"       <%= "duration".equals(request.getParameter("sortBy"))?"selected":"" %>>Duration</option>
-    </select>
-    <select name="sortDir">
-      <option value="ASC"  <%= "ASC".equals(request.getParameter("sortDir"))?"selected":"" %>>Asc</option>
-      <option value="DESC" <%= "DESC".equals(request.getParameter("sortDir"))?"selected":"" %>>Desc</option>
-    </select>
-  </div>
-
-  <button type="submit">Search</button>
-</form>
-
-<h2>Available Flights</h2>
-<table>
-  <tr>
-    <th>ID</th><th>Price</th><th>Dep Time</th><th>Arr Time</th>
-    <th>Dep Loc</th><th>Arr Loc</th><th>Stops</th><th>Airline</th><th>Dur (min)</th>
-  </tr>
-<%
-  // Grab params
-  String tripType   = request.getParameter("tripType"),
-         from       = request.getParameter("Source"),
-         to         = request.getParameter("Destination"),
-         depDate    = request.getParameter("departure"),
-         retDate    = request.getParameter("returnDate"),
-         sortBy     = request.getParameter("sortBy"),
-         sortDir    = request.getParameter("sortDir");
-
-  boolean flexible = request.getParameter("flexibleDates") != null;
-  String[] priceRange = request.getParameterValues("priceRange");
-  String[] stopsArr   = request.getParameterValues("stops");
-  String[] airlines   = request.getParameterValues("airlines");
-  String depTimeStart = request.getParameter("depTimeStart"),
-         depTimeEnd   = request.getParameter("depTimeEnd"),
-         arrTimeStart = request.getParameter("arrTimeStart"),
-         arrTimeEnd   = request.getParameter("arrTimeEnd");
-
-  if(from!=null && to!=null && depDate!=null && !depDate.isEmpty()){
-    try {
-      ApplicationDB db=new ApplicationDB();
-      Connection con=db.getConnection();
-
-      StringBuilder sql = new StringBuilder(
-        "SELECT *, TIMESTAMPDIFF(MINUTE,departure_time,arrival_time) AS duration "
-        +"FROM flights WHERE departure_airport_id=? AND arrival_airport_id=? "
-      );
-
-      // departure date
-      if(flexible){
-        sql.append("AND DATE(departure_time) BETWEEN DATE_SUB(?,INTERVAL 3 DAY) ")
-           .append("AND DATE_ADD(?,INTERVAL 3 DAY) ");
-      } else {
-        sql.append("AND DATE(departure_time)=? ");
-      }
-      // round-trip return
-      if("roundTrip".equals(tripType) && retDate!=null && !retDate.isEmpty()){
-        if(flexible){
-          sql.append("AND DATE(arrival_time) BETWEEN DATE_SUB(?,INTERVAL 3 DAY) ")
-             .append("AND DATE_ADD(?,INTERVAL 3 DAY) ");
-        } else {
-          sql.append("AND DATE(arrival_time)=? ");
-        }
-      }
-      // priceRange filter
-      if(priceRange!=null){
-        sql.append("AND (");
-        for(int i=0;i<priceRange.length;i++){
-          if(i>0) sql.append(" OR ");
-          switch(priceRange[i]){
-            case "low":  sql.append("price<=300"); break;
-            case "mid":  sql.append("price BETWEEN 300 AND 600"); break;
-            case "high": sql.append("price>600"); break;
-          }
-        }
-        sql.append(") ");
-      }
-      // stops filter
-      if(stopsArr!=null){
-        sql.append("AND number_of_stops IN (");
-        for(int i=0;i<stopsArr.length;i++){
-          if(i>0) sql.append(",");
-          sql.append("?");
-        }
-        sql.append(") ");
-      }
-      // airlines filter
-      if(airlines!=null){
-        sql.append("AND airline_id IN (");
-        for(int i=0;i<airlines.length;i++){
-          if(i>0) sql.append(",");
-          sql.append("?");
-        }
-        sql.append(") ");
-      }
-      // departure-time window
-      if(depTimeStart!=null && !depTimeStart.isEmpty())
-        sql.append("AND TIME(departure_time)>=? ");
-      if(depTimeEnd!=null   && !depTimeEnd.isEmpty())
-        sql.append("AND TIME(departure_time)<=? ");
-      // arrival-time window
-      if(arrTimeStart!=null && !arrTimeStart.isEmpty())
-        sql.append("AND TIME(arrival_time)>=? ");
-      if(arrTimeEnd!=null   && !arrTimeEnd.isEmpty())
-        sql.append("AND TIME(arrival_time)<=? ");
-      // sorting
-      if(sortBy!=null && !sortBy.isEmpty()){
-        sql.append("ORDER BY ")
-           .append("duration".equals(sortBy)?"duration":sortBy)
-           .append(" ").append(sortDir!=null?sortDir:"ASC");
-      }
-
-      PreparedStatement s = con.prepareStatement(sql.toString());
-      int idx=1;
-      s.setString(idx++, from);
-      s.setString(idx++, to);
-      if(flexible){
-        s.setString(idx++, depDate);
-        s.setString(idx++, depDate);
-      } else {
-        s.setString(idx++, depDate);
-      }
-      if("roundTrip".equals(tripType) && retDate!=null && !retDate.isEmpty()){
-        if(flexible){
-          s.setString(idx++, retDate);
-          s.setString(idx++, retDate);
-        } else {
-          s.setString(idx++, retDate);
-        }
-      }
-      // bind stops
-      if(stopsArr!=null){
-        for(String st: stopsArr){
-          s.setInt(idx++, Integer.parseInt(st));
-        }
-      }
-      // bind airlines
-      if(airlines!=null){
-        for(String al: airlines){
-          s.setString(idx++, al);
-        }
-      }
-      // bind time windows
-      if(depTimeStart!=null && !depTimeStart.isEmpty())
-        s.setTime(idx++, java.sql.Time.valueOf(depTimeStart));
-      if(depTimeEnd!=null   && !depTimeEnd.isEmpty())
-        s.setTime(idx++, java.sql.Time.valueOf(depTimeEnd));
-      if(arrTimeStart!=null && !arrTimeStart.isEmpty())
-        s.setTime(idx++, java.sql.Time.valueOf(arrTimeStart));
-      if(arrTimeEnd!=null   && !arrTimeEnd.isEmpty())
-        s.setTime(idx++, java.sql.Time.valueOf(arrTimeEnd));
-
-      ResultSet rs = s.executeQuery();
-      while(rs.next()){
-        out.print("<tr>"
-          + "<td>"+rs.getString("flight_id")+"</td>"
-          + "<td>"+rs.getBigDecimal("price")+"</td>"
-          + "<td>"+rs.getString("departure_time")+"</td>"
-          + "<td>"+rs.getString("arrival_time")+"</td>"
-          + "<td>"+rs.getString("departure_airport_id")+"</td>"
-          + "<td>"+rs.getString("arrival_airport_id")+"</td>"
-          + "<td>"+rs.getInt("number_of_stops")+"</td>"
-          + "<td>"+rs.getString("airline_id")+"</td>"
-          + "<td>"+rs.getInt("duration")+"</td>"
-          + "</tr>");
-      }
-      rs.close(); s.close(); con.close();
-    } catch(Exception e){
-      response.sendRedirect("login.jsp?error=Database+error");
-      return;
-    }
-  }
-%>
-</table>
+</div>
 </body>
 </html>

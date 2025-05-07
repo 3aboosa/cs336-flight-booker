@@ -15,22 +15,23 @@
 		<%
 		  String username = request.getParameter("username");
 		  String password = request.getParameter("passwd");
-		
+	
+			
 		  if (username == null || password == null || username.trim().isEmpty() || password.trim().isEmpty()) {
 		    response.sendRedirect("login.jsp?error=Missing+username+or+password");
 		    return;
 		  }
 		
 		  boolean validUser = false;
+		  String role = "Customer"; // default 
 		  String firstName = "";
-		  boolean customerREP = false;
+		  int uid = -1; // initial
 		
 		  try {
 			ApplicationDB db = new ApplicationDB();	
 			Connection con = db.getConnection();
-		
+			// changed below to select uid as well 
 		    PreparedStatement stmt = con.prepareStatement("SELECT first_name, password, uid FROM individual WHERE username = ?");
-		    PreparedStatement stmt2 = con.prepareStatement("SELECT * from customerrepresentative where uid = ?");
 		    stmt.setString(1, username);
 		    ResultSet rs = stmt.executeQuery();
 		
@@ -39,14 +40,33 @@
 		      if (dbPassword.equals(password)) {
 		        validUser = true;
 		        firstName = rs.getString("first_name");
-		        int uid = rs.getInt("uid");
+		        uid = rs.getInt("uid");
+		        
+		        PreparedStatement stmt2 = con.prepareStatement("SELECT * FROM admin WHERE uid =?");
 		        stmt2.setInt(1, uid);
-		        ResultSet rs2 = stmt2.executeQuery();
-		        if (rs2.next()){
-		        	customerREP = true;
+		        ResultSet adminrs = stmt2.executeQuery();
+		        if (adminrs.next()){
+		        	role = "admin";
 		        }
+		        adminrs.close();
+		        stmt2.close();
+		        
+		        if (role.equals("admin")== false){
+		        	PreparedStatement stmt3 = con.prepareStatement("SELECT * FROM customerrepresentative WHERE uid= ?");
+		        	stmt3.setInt(1,uid);
+		        	ResultSet reprs = stmt3.executeQuery();
+		        	if (reprs.next()){
+		        		role = "customerrepresentative";
+		     
+		        	}
+		        	reprs.close();
+		        	stmt3.close();
+		        }
+		        
 		      }
 		    }
+		   
+		    
 		
 		    rs.close();
 		    stmt.close();
@@ -59,10 +79,16 @@
 		  if (validUser) {
 		    session.setAttribute("username", username);
 		    session.setAttribute("firstName", firstName);
-			if (customerREP){
+		   	session.setAttribute("uid", uid); // added
+		   	session.setAttribute("role", role); //added vhp
+		   	// added the try below here
+		   	
+			if(role.equals("admin")){
+				response.sendRedirect("admin.jsp");
+			} else if (role.equals("customerrepresentative")){
 				response.sendRedirect("Customerrep.jsp");
-			} else{
-				response.sendRedirect("welcome.jsp");
+			} else {
+		    	response.sendRedirect("welcome.jsp"); // default, that they are a customer 
 			}
 		  } else {
 		    response.sendRedirect("login.jsp?error=Invalid+username+or+password");

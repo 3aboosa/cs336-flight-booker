@@ -8,7 +8,7 @@
 
     // Authentication and role check (assumes "role" session attribute)
     String role = (String) session.getAttribute("role");
-    if (role == null || !role.equals("rep")) {
+    if (role == null || !role.equals("customerrepresentative")) {
         response.sendRedirect("login.jsp");
         return;
     }
