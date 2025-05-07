@@ -11,7 +11,7 @@
 		<title>DAV AIR</title>
 	</head>
 	
-	<body style="margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif;">
+	<body style="background-color: lightblue; margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif;">
 	
 		<div style="display: flex; justify-content: flex-end; margin: 10px;">
 			<div style="display: flex;  justify-content: space-between; width: 100px;">
@@ -27,6 +27,10 @@
 				DAV AIR
 			</h1>
 			<p>Book flights with ease</p>
+		</div>
+		<div>
+			<img src="img/weird.jpg" >
+			<img src="img/better.jpg" >
 		</div>
 
 </body>
