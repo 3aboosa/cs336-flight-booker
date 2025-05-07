@@ -23,12 +23,14 @@
 		
 		  boolean validUser = false;
 		  String firstName = "";
+		  boolean customerREP = false;
 		
 		  try {
 			ApplicationDB db = new ApplicationDB();	
 			Connection con = db.getConnection();
 		
-		    PreparedStatement stmt = con.prepareStatement("SELECT first_name, password FROM individual WHERE username = ?");
+		    PreparedStatement stmt = con.prepareStatement("SELECT first_name, password, uid FROM individual WHERE username = ?");
+		    PreparedStatement stmt2 = con.prepareStatement("SELECT * from customerrepresentative where uid = ?");
 		    stmt.setString(1, username);
 		    ResultSet rs = stmt.executeQuery();
 		
@@ -37,6 +39,12 @@
 		      if (dbPassword.equals(password)) {
 		        validUser = true;
 		        firstName = rs.getString("first_name");
+		        int uid = rs.getInt("uid");
+		        stmt2.setInt(1, uid);
+		        ResultSet rs2 = stmt2.executeQuery();
+		        if (rs2.next()){
+		        	customerREP = true;
+		        }
 		      }
 		    }
 		
@@ -51,7 +59,11 @@
 		  if (validUser) {
 		    session.setAttribute("username", username);
 		    session.setAttribute("firstName", firstName);
-		    response.sendRedirect("welcome.jsp");
+			if (customerREP){
+				response.sendRedirect("Customerrep.jsp");
+			} else{
+				response.sendRedirect("welcome.jsp");
+			}
 		  } else {
 		    response.sendRedirect("login.jsp?error=Invalid+username+or+password");
 		  }
