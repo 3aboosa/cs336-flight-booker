@@ -4,7 +4,7 @@
 <%@ page import="javax.servlet.http.*,javax.servlet.*" %>
 
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE html>
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
@@ -62,21 +62,21 @@
 		
 		
 		<style>
-		table {
-		  font-family: arial, sans-serif;
-		  border-collapse: collapse;
-		  width: 100%;
-		}
-		
-		td, th {
-		  border: 1px solid #dddddd;
-		  text-align: left;
-		  padding: 8px;
-		}
-
-		tr:nth-child(even) {
-		  background-color: #dddddd;
-		}
+			table {
+			  font-family: arial, sans-serif;
+			  border-collapse: collapse;
+			  width: 100%;
+			}
+			
+			td, th {
+			  border: 1px solid #dddddd;
+			  text-align: left;
+			  padding: 8px;
+			}
+	
+			tr:nth-child(even) {
+			  background-color: #dddddd;
+			}
 		</style>
 	
 	<hr style = "border: 1px solid #a6a6a6; margin: 20px 0;">
@@ -97,7 +97,6 @@
 	<%
 	    }
 	%>
-
 		
 		<h3 style="text-decoration: underline; font-weight:bold">Add User</h3>
 	<form method = "post" action = "addUser.jsp">
@@ -123,48 +122,50 @@
 	<input type = "text" name = "phone">
 	<button type = "submit" > Add User</button>
 	</form>
-		<hr style = "border: 1px solid #a6a6a6; margin: 20px 0;">
 	
-		<h2>Flight Reservations </h2>
+	<hr style = "border: 1px solid #a6a6a6; margin: 20px 0;">
 	
-		<form method = "post" action = "admin.jsp">
-			<label for = "flight_id">Flight ID: </label>
-			<input type = "text" name = "flight_id">
-			<label for= "first_name">First Name:</label>
-			<input type = "text" name="first_name" >
-			<label for= "last_name">Last Name:</label>
-			<input type = "text" name="last_name" >
-		
+	
+	<h2>Flight Reservations </h2>
+	
+	<form method = "get" action = "admin.jsp">
+		<label for = "flight_id">Flight ID: </label>
+		<input type = "text" name = "flight_id">
+		<label for= "first_name">First Name:</label>
+		<input type = "text" name="first_name" >
+		<label for= "last_name">Last Name:</label>
+		<input type = "text" name="last_name" >
+	
+		<input type="hidden" name="searchReservations" value="true">
 		<button type = "submit" > Search</button>
+	</form>
 		<%
-	    String flightId = request.getParameter("flight_id");
-	    String first_name = request.getParameter("first_name");
-	    String last_name = request.getParameter("last_name");
+	    String reserve_flight_id = request.getParameter("flight_id");
+	    String reserve_first_name = request.getParameter("first_name");
+	    String reserve_last_name = request.getParameter("last_name");
 	
-	    boolean hasInput = (flightId != null && !flightId.trim().isEmpty()) ||
-	                       (first_name != null && !first_name.trim().isEmpty()) ||
-	                       (last_name != null && !last_name.trim().isEmpty());
+	    boolean hasInput = (reserve_flight_id != null && !reserve_flight_id.trim().isEmpty()) || (reserve_first_name != null && !reserve_first_name.trim().isEmpty()) ||
+	                       (reserve_last_name != null && !reserve_last_name.trim().isEmpty());
 
     	if (hasInput) {
 		%>
 		    <jsp:include page="reservations.jsp">
-		        <jsp:param name="flight_id" value="<%= flightId %>" />
-		        <jsp:param name="first_name" value="<%= first_name %>" />
-		        <jsp:param name="last_name" value="<%= last_name %>" />
+		        <jsp:param name="flight_id" value="<%= reserve_flight_id %>" />
+		        <jsp:param name="first_name" value="<%= reserve_first_name %>" />
+		        <jsp:param name="last_name" value="<%= reserve_last_name %>" />
 		    </jsp:include>
 		<%
 		    }
 		%>
 		<hr style = "border: 1px solid #a6a6a6; margin: 20px 0;">
 		
-	
 		
 		<h2>Sales Report</h2>
 	
 		<form method="post" action="admin.jsp">
-	    <label for="sales_month">Select Month:</label>
-	    <input type="month" name="sales_month" >
-	    <button type="submit">Generate Report</button>
+		    <label for="sales_month">Select Month:</label>
+		    <input type= "month" name="sales_month" required >
+		    <button type="submit">Generate Report</button>
 		</form>
 		<%
 	    String salesMonth = request.getParameter("sales_month");
@@ -181,48 +182,62 @@
 		
 	<h2>Revenue</h2>
 	<form method = "post" action = "admin.jsp">
-		<label for = "flight_id2">Flight ID: </label>
-		<input type = "text" name = "flight_id2">
-		<label for = "airline_id2">Airline ID: </label>
-		<input type = "text" name = "airline_id2">
-		<label for= "first_name2">First Name:</label>
-		<input type = "text" name="first_name2" >
-		<label for= "last_name2">Last Name:</label>
-		<input type = "text" name="last_name2" >
-		
+		<label for = "revenue_flight_id">Flight ID: </label>
+		<input type = "text" name = "revenue_flight_id">
+		<label for = "revenue_airline_id">Airline ID: </label>
+		<input type = "text" name = "revenue_airline_id">
+		<label for= "revenue_first_name">First Name:</label>
+		<input type = "text" name="revenue_first_name" >
+		<label for= "revenue_last_name">Last Name:</label>
+		<input type = "text" name="revenue_last_name" >
 		<button type = "submit" > Generate Summary</button>
+	</form>
 		<%
-	    String flightId2 = request.getParameter("flight_id2");
-		String airlineId2 = request.getParameter("airline_id2");
-	    String first_name2 = request.getParameter("first_name2");
-	    String last_name2 = request.getParameter("last_name2");
+	    String revenue_flight_id = request.getParameter("revenue_flight_id");
+		String revenue_airline_id = request.getParameter("revenue_airline_id");
+	    String revenue_first_name = request.getParameter("revenue_first_name");
+	    String revenue_last_name = request.getParameter("revenue_last_name");
 	
-	    boolean hasInput2 = (flightId2 != null && !flightId2.trim().isEmpty()) ||
-	                       (first_name2 != null && !first_name2.trim().isEmpty()) ||
-	                       (last_name2 != null && !last_name2.trim().isEmpty()) ||
-	                       (airlineId2 != null && !airlineId2.trim().isEmpty());
+	    boolean hasInput2 = (revenue_flight_id != null && !revenue_flight_id.trim().isEmpty()) || (revenue_first_name != null && !revenue_first_name.trim().isEmpty()) 
+	    					|| (revenue_last_name != null && !revenue_last_name.trim().isEmpty()) || (revenue_airline_id != null && !revenue_airline_id.trim().isEmpty());
 
     	if (hasInput2) {
 		%>
 		    <jsp:include page="revenue.jsp">
-		        <jsp:param name="flight_id2" value="<%= flightId2 %>" />
-		        <jsp:param name="airline_id2" value="<%= airlineId2 %>" />
-		        <jsp:param name="first_name2" value="<%= first_name2 %>" />
-		        <jsp:param name="last_name2" value="<%= last_name2 %>" />
+		        <jsp:param name="revenue_flight_id" value="<%= revenue_flight_id %>" />
+		        <jsp:param name="airline_id2" value="<%= revenue_airline_id %>" />
+		        <jsp:param name="first_name2" value="<%= revenue_first_name %>" />
+		        <jsp:param name="last_name2" value="<%= revenue_last_name %>" />
 		    </jsp:include>
 		<%
 		    }
 		%>
-		<h3 style="text-decoration: underline; font-weight:bold">Customer with Most Revenue (All-Time)</h3>
+		<h3 style="text-decoration: underline; font-weight:bold">Customer with Most Revenue</h3>
 
-		<form method="get" action="admin.jsp">
-			
+		
+			<form method="get" action="admin.jsp">
+		    <label for="topCount">Top #:</label>
+		    <input type="number" name="topCount" id="topCount" min="1" required>
+		    
+		    <div style="margin-top: 10px; margin-bottom: 10px;">
+		        <label for="startDate">Start Date:</label>
+		        <input type="date" name="startDate" id="startDate">
+		        
+		        <label for="endDate">End Date:</label>
+		        <input type="date" name="endDate" id="endDate">
+		    
+		        <div class="button-container" style="margin-top: 10px;">
+		            <button type="submit" name="generateType" value="dateRange">Generate by Date Range</button>
+		            <button type="submit" name="generateType" value="allTime">Generate All-Time Top Customers</button>
+		        </div>
+		    </div>
+		    
 		    <input type="hidden" name="mostRevenueCustomer" value="true">
-		    <button type="submit">Generate Top Customer</button>
 		</form>
 		
 		<%
 		    String mostRevenue = request.getParameter("mostRevenueCustomer");
+		    String generateType = request.getParameter("generateType");
 		    if (mostRevenue != null && mostRevenue.equals("true")) {
 		%>
 		    <jsp:include page="mostRevenueCustomer.jsp" />
@@ -231,10 +246,25 @@
 		%>
 		<h3 style="text-decoration: underline; font-weight:bold">Most Active Flights (All-Time)</h3>
 
-		<form method="get" action="admin.jsp">
-			
+		
+			<form method="get" action="admin.jsp">
+		    <label for="topFlightCount">Top #:</label>
+		    <input type="number" name="topFlightCount" id="topFlightCount" min="1" required>
+		    
+		    <div style="margin-top: 10px; margin-bottom: 10px;">
+		        <label for="flightStartDate">Start Date:</label>
+		        <input type="date" name="flightStartDate" id="flightStartDate">
+		        
+		        <label for="flightEndDate">End Date:</label>
+		        <input type="date" name="flightEndDate" id="flightEndDate">
+		    
+		        <div class="button-container" style="margin-top: 10px;">
+		            <button type="submit" name="flightGenerateType" value="flightDateRange">Generate by Date Range</button>
+		            <button type="submit" name="flightGenerateType" value="flightAllTime">Generate All-Time Top Flights</button>
+		        </div>
+		    </div>
+		    
 		    <input type="hidden" name="mostActiveFlight" value="true">
-		    <button type="submit">Generate Most Active Flights</button>
 		</form>
 		
 		<%

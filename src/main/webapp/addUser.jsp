@@ -16,6 +16,8 @@
 		response.sendRedirect("admin.jsp?error=Missing+fields");
 		return;
 	}
+	first_name = first_name != null && !first_name.isEmpty() ? String.format("%s%s", first_name.substring(0, 1).toUpperCase(), first_name.substring(1).toLowerCase()) : first_name;
+    last_name = last_name != null && !last_name.isEmpty() ? String.format("%s%s", last_name.substring(0, 1).toUpperCase(), last_name.substring(1).toLowerCase()) : last_name;
 	
 	try{
 		ApplicationDB db = new ApplicationDB();

@@ -4,44 +4,44 @@
 <%@ page import="javax.servlet.http.*,javax.servlet.*" %>
 
 <%
-	String flight_id = request.getParameter("flight_id2");
-	String airline_id = request.getParameter("airline_id2");
-	String first_name = request.getParameter("first_name2");
-	String last_name = request.getParameter("last_name2"); 
-   
-        try {
-            ApplicationDB db = new ApplicationDB();
-            Connection con = db.getConnection();
+	String flight_id = request.getParameter("revenue_flight_id");
+	String airline_id = request.getParameter("revenue_airline_id");
+	String first_name = request.getParameter("revenue_first_name");
+	String last_name = request.getParameter("revenue_last_name"); 
 
-            StringBuilder query = new StringBuilder(
-                    "SELECT t.ticket_id, t.uid, t.first_name, t.last_name, a.flight_id, f.airline_id, t.total_fare, t.booking_fee " +
-                    "FROM ticket t " +
-                    "JOIN associated_with_ticketflight a ON t.ticket_id = a.ticket_id " +
-                    "JOIN flights f ON a.flight_id = f.flight_id AND a.airline_id = f.airline_id " +
-                    "WHERE 1=1"
-                );
+       try {
+           ApplicationDB db = new ApplicationDB();
+           Connection con = db.getConnection();
 
-                List<String> params = new ArrayList<String>();
+           StringBuilder query = new StringBuilder(
+                   "SELECT t.ticket_id, t.uid, t.first_name, t.last_name, a.flight_id, f.airline_id, t.total_fare, t.booking_fee " +
+                   "FROM ticket t " +
+                   "JOIN associated_with_ticketflight a ON t.ticket_id = a.ticket_id " +
+                   "JOIN flights f ON a.flight_id = f.flight_id AND a.airline_id = f.airline_id " +
+                   "WHERE 1=1"
+               );
 
-                if (flight_id != null && !flight_id.trim().isEmpty()) {
-                    query.append(" AND a.flight_id = ?");
-                    params.add(flight_id.trim());
-                }
+               List<String> params = new ArrayList<String>();
 
-                if (airline_id != null && !airline_id.trim().isEmpty()) {
-                    query.append(" AND f.airline_id = ?");
-                    params.add(airline_id.trim());
-                }
+               if (flight_id != null && !flight_id.trim().isEmpty()) {
+                   query.append(" AND a.flight_id = ?");
+                   params.add(flight_id.trim());
+               }
 
-                if (first_name != null && !first_name.trim().isEmpty()) {
-                    query.append(" AND t.first_name = ?");
-                    params.add(first_name.trim());
-                }
+               if (airline_id != null && !airline_id.trim().isEmpty()) {
+                   query.append(" AND f.airline_id = ?");
+                   params.add(airline_id.trim());
+               }
 
-                if (last_name != null && !last_name.trim().isEmpty()) {
-                    query.append(" AND t.last_name = ?");
-                    params.add(last_name.trim());
-                }
+               if (first_name != null && !first_name.trim().isEmpty()) {
+                   query.append(" AND t.first_name = ?");
+                   params.add(first_name.trim());
+               }
+
+               if (last_name != null && !last_name.trim().isEmpty()) {
+                   query.append(" AND t.last_name = ?");
+                   params.add(last_name.trim());
+               }
 
 %>
             <table>
@@ -85,7 +85,7 @@
 
             if (!search) {
 %>
-                <tr><td colspan="8">No revenue found for this month.</td></tr>
+                <tr><td colspan="8">No revenue found.</td></tr>
 <%
             } else {
 %>
@@ -94,13 +94,14 @@
 
             }
             %>
-            </table>
+           
       <%  
             rs.close();
             stmt.close();
             con.close();
         } catch (Exception e) {
-            out.println("<p>Error generating revenue.</p>");
+            out.println("<p>Error generating revenue. " + e.getMessage() + "</p>");
         }
     
 %>
+ </table>
