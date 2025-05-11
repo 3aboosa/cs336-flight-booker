@@ -114,13 +114,13 @@
 		<label for="role">Role: </label>
 			<select name = "role" >
 				<option value = "customer">Customer </option>
-				<option value = "customerrepresentative">Customer Representative </option>
-				<option value = "admin">Administrator </option>
+				<option value = "customerrepresentative">Customer Representative </option> 
 			</select>
 	
 	<label for ="phone_number">Phone (for customers only):</label>
 	<input type = "text" name = "phone">
 	<button type = "submit" > Add User</button>
+
 	</form>
 	
 	<hr style = "border: 1px solid #a6a6a6; margin: 20px 0;">

@@ -6,6 +6,7 @@
 <%
 	String mostActiveFlight = request.getParameter("mostActiveFlight");
 	String flightGenerateType = request.getParameter("flightGenerateType");
+
 	
 	String flightStartDate = request.getParameter("flightStartDate");
 	String flightEndDate = request.getParameter("flightEndDate");
@@ -63,7 +64,7 @@
 	    	search = true;
 	%>
 	    <tr>
-	        <td><%= rs.getInt("flight_id") %></td>
+	        <td><%= rs.getString("flight_id") %></td>
 	        <td><%= rs.getString("airline_id") %></td>
 	        <td><%= rs.getInt("total_tickets") %></td>
 	    </tr>

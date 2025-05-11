@@ -25,46 +25,63 @@ if (searchUser != null && !searchUser.trim().isEmpty()) {
 	    		<th> username </th>
 	    		<th> password </th>
 	    		<th> First Name </th>
+	    	
 	    		<th> Last Name </th>
+	    		<th>Phone Number</th>
 	    	</tr>
 	    
 <% 
 	    while (rs.next()) {
-	    	search = true;
-	    	%>
-			<tr> 
-			<td><%= rs.getInt("uid") %></td>
-			
-			<td><%= rs.getString("username") %></td>
-			<td><%= rs.getString("password") %></td>
-			<td><%= rs.getString("first_name") %></td>
-			<td><%= rs.getString("last_name") %></td>
-			<td>
-				<form method = "post" action ="deleteUser.jsp" style = "display:inline;">
-					<input type ="hidden" name="uid" value="<%=rs.getInt("uid") %>">
-					<button type ="submit" onclick="return confirm('Are you sure you want to delete this user?')">Delete</button>
-				
-				</form>
-			
-			</td>
-			
-			</tr>
-<%
-		}
-		if (!search){
-			out.println("<tr><td colspan='5'>No users found.</td></tr>");
-		}
+	    	 search = true;
+             String username = rs.getString("username");
+             int uid = rs.getInt("uid");
+             String firstName = rs.getString("first_name");
+             String lastName = rs.getString("last_name");
+             String password = rs.getString("password");
+             String phoneNumber = "";  
+             
+            
+             PreparedStatement stmt2 = con.prepareStatement("SELECT phone_number FROM customer WHERE uid = ?");
+             stmt2.setInt(1, uid);
+             ResultSet rs2 = stmt2.executeQuery();
+             
+             if (rs2.next()) {
+                 phoneNumber = rs2.getString("phone_number");  
+             }
+
+             rs2.close();
 %>
-
-   		</table>
-   	<% 
-		rs.close();
-		stmt.close();
-		con.close();
-	  } catch (Exception e) {
-	    response.sendRedirect("admin.jsp?error=Search+error");
-	    return;
-	  }
+             <tr> 
+                 <td><%= uid %></td>
+                 <td><%= username %></td>
+                 <td><%= password %></td>
+                 <td><%= firstName %></td>
+                 <td><%= lastName %></td>
+                 <td><%= phoneNumber %></td> 
+                 <td>
+                     <form method="post" action="deleteUser.jsp" style="display:inline;">
+                         <input type="hidden" name="uid" value="<%= uid %>">
+                         <button type="submit" onclick="return confirm('Are you sure you want to delete this user?')">Delete</button>
+                     </form>
+                     <a href="editUser.jsp?username=<%= username %>">
+                         <button>Edit</button>
+                     </a>
+                 </td>
+             </tr>
+<%
+         }
+         if (!search) {
+             out.println("<tr><td colspan='7'>No users found.</td></tr>");
+         }
+%>
+     </table>
+<% 
+     rs.close();
+     stmt.close();
+     con.close();
+ } catch (Exception e) {
+     response.sendRedirect("admin.jsp?error=Search+error");
+     return;
+ }
 }
-
 %>

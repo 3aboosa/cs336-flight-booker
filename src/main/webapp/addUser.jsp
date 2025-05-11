@@ -37,12 +37,7 @@
 		stmt2.close();
 		rs.close();
 		
-		if (role.equals("admin")){
-			PreparedStatement stmt3 = con.prepareStatement("INSERT INTO admin (uid) VALUES (?)");
-			stmt3.setInt(1, uid);
-			stmt3.executeUpdate();
-			stmt3.close();
-		} else if (role.equals("customerrepresentative")){
+		if (role.equals("customerrepresentative")){
 			PreparedStatement stmt3 = con.prepareStatement("INSERT INTO customerrepresentative (uid) VALUES (?)");
 			stmt3.setInt(1, uid);
 			stmt3.executeUpdate();
