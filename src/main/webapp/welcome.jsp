@@ -317,7 +317,7 @@
       <div class="form-row">
         <input type="checkbox" name="flexibleDates" id="flexibleDates"
           <%=flexible?"checked":""%>/>
-        <label for="flexibleDates">Flexible Dates (±3 Days)</label>
+        <label for="flexibleDates">Flexible Dates by 3 days</label>
       </div>
 
       <!-- Sort -->
