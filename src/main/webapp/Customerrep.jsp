@@ -3,10 +3,7 @@
          pageEncoding="UTF-8"
          import="com.cs336.pkg.*,java.sql.*,java.util.*" %>
 <%
-    // Prevent caching
-    response.setHeader("Cache-Control","no-cache,no-store,must-revalidate");
-    response.setHeader("Pragma","no-cache");
-    response.setDateHeader("Expires", 0);
+
 
     // Auth & role
     String role = (String)session.getAttribute("role");
@@ -38,7 +35,6 @@
             }
         }
 
-        // --- AIRPORT ---
         if ("addAirport".equals(action)) {
             try (PreparedStatement ps = con.prepareStatement(
                     "INSERT INTO airport(airport_id,city,country,name) VALUES(?,?,?,?)")) {
@@ -348,7 +344,7 @@
             }
             message = "Ticket updated.";
 
-        // --- LIST FLIGHTS BY AIRPORT ---
+
         } else if ("listFlights".equals(action)) {
             String aid = request.getParameter("listAirportId");
             flightsForAirport = new ArrayList<>();
@@ -454,7 +450,7 @@
     </div>
   </div>
 
-  <!-- Manage Aircraft -->
+ 
   <div class="section">
     <h2>Manage Aircraft</h2>
     <div class="split">
@@ -517,7 +513,6 @@
     </div>
   </div>
 
-  <!-- Manage Flight -->
   <div class="section">
     <h2>Manage Flight</h2>
     <div class="split">
@@ -655,7 +650,6 @@
     </div>
   </div>
 
-  <!-- List Flights by Airport -->
   <div class="section">
     <h2>Flights for Airport</h2>
     <form method="post">

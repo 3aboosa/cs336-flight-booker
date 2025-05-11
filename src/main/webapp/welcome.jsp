@@ -274,8 +274,35 @@
   }
 %>
 
-<div><a href="handleLogout.jsp">Logout</a></div>
-<h1>Welcome, <%= firstName %>!</h1>
+<style>
+  header {
+    position: relative;
+    padding: 1em;
+    background: #f5f5f5;
+  }
+
+  .top-links {
+    position: absolute;
+    top: 1em;    
+    right: 1em; 
+  }
+
+  .top-links a {
+    margin-left: 1em;
+    text-decoration: none;
+    color: #007bff;
+  }
+</style>
+
+<header>
+  <div class="top-links">
+    <a href="browseQuestions.jsp">FAQ</a>
+    <a href="myFlights.jsp">View My Flights</a>
+    <a href="handleLogout.jsp">Logout</a>
+  </div>
+  <h1>Welcome, <%= firstName %>!</h1>
+</header>
+
 
 <div class="layout">
   <!-- Left: filters + search -->
