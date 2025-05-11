@@ -17,13 +17,7 @@ try {
     stmt.setString(1, username);
     ResultSet rs = stmt.executeQuery();
 
-    if (!rs.next()) {
-        rs.close();
-        stmt.close();
-        con.close();
-        response.sendRedirect("admin.jsp?error=User+not+found");
-        return;
-    }
+    rs.next();
 
     int uid = rs.getInt("uid");
     rs.close();
@@ -34,7 +28,7 @@ try {
     stmt2.setString(1, firstName);
     stmt2.setString(2, lastName);
     stmt2.setInt(3, uid);
-    int update = stmt2.executeUpdate();
+    stmt2.executeUpdate();
     stmt2.close();
 
   
@@ -55,12 +49,7 @@ try {
     }
 
     con.close();
-    
-    if (update > 0) {
-        response.sendRedirect("admin.jsp?success=User+updated");
-    } else {
-        response.sendRedirect("admin.jsp?error=No+changes+made");
-    }
+    response.sendRedirect("admin.jsp?success=User+updated");
 
 } catch (Exception e) {
     response.sendRedirect("admin.jsp?error=Error+updating+user:+" + e.getMessage());
